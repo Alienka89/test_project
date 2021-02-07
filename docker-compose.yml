@@ -1,0 +1,88 @@
+version: '3.2'
+
+services:
+  django-app:
+    env_file: .env
+    container_name: test-proj-django-app
+    build: .
+    image: django-docker
+    restart: always
+    command: holdup tcp://$POSTGRES_HOST:$POSTGRES_PORT -- python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - "./app:/usr/src/app"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      - django-db
+
+  celery-worker:
+    env_file: .env
+    container_name: test-proj-celery-worker
+    build: .
+    image: django-docker
+    restart: always
+    command: celery -A test_project worker -l info
+    volumes:
+      - "./app:/usr/src/app"
+    depends_on:
+      - django-db
+
+  celery-beat:
+    env_file: .env
+    container_name: test-proj-celery-beat
+    build: .
+    image: django-docker
+    restart: always
+    command: celery -A test_project beat -l info
+    volumes:
+      - "./app:/usr/src/app"
+    depends_on:
+      - django-db
+
+  flower:
+    env_file: .env
+    container_name: test-proj-django-flower
+    image: mher/flower
+    restart: always
+    ports:
+      - 8888:8888
+
+  django-migrate:
+    env_file: .env
+    container_name: test-proj-django-migrate
+    build: .
+    image: django-docker
+    command: holdup tcp://$POSTGRES_HOST:$POSTGRES_PORT -- python manage.py migrate
+    volumes:
+      - "./app:/usr/src/app"
+    depends_on:
+      - django-db
+
+  django-loaddata:
+    env_file: .env
+    container_name: test-proj-django-loaddata
+    build: .
+    image: django-docker
+    command: holdup tcp://$POSTGRES_HOST:$POSTGRES_PORT -- python manage.py loaddata dump/db.json
+    volumes:
+      - "./app:/usr/src/app"
+    depends_on:
+      - django-db
+      - django-migrate
+
+  redis:
+    env_file: .env
+    container_name: test-proj-redis
+    image: redis
+    restart: always
+    ports:
+    - "127.0.0.1:6379:6379"
+
+  django-db:
+    env_file: .env
+    container_name: test-proj-django-db
+    image: postgres:10.10-alpine
+    restart: always
+    ports:
+      - "127.0.0.1:5433:5432"
+
